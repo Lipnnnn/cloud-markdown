@@ -1,9 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
+/**
+ * FileSearch组件，是左上角用于搜索文件的组件
+ * @param {title, onFileSearch}
+ * title表示传入的标题 ，onFileSearch表示输入框回车之后的回调函数
+ * @returns
+ */
 const FileSearch = ({ title, onFileSearch }) => {
   // 是否激活“输入”
   const [inputActive, setInputActive] = useState(false);
+  // 输入框的值
   const [value, setValue] = useState('');
+  // 表示输入框这个dom节点，在这里是用于自动获取焦点
+  let node = useRef(null);
+
+  useEffect(() => {
+    // 监听输入框的回车事件
+    const handleInputEvent = (e) => {
+      if (e.key === 'Enter' && inputActive) {
+        onFileSearch(value);
+      }
+    };
+    document.addEventListener('keyup', handleInputEvent);
+    // 组件卸载时，移除监听
+    return () => {
+      document.removeEventListener('keyup', handleInputEvent);
+    };
+  });
+
+  useEffect(() => {
+    // 自动获取焦点
+    if (inputActive) {
+      node.current.focus();
+    }
+  }, [inputActive]);
 
   return (
     <div className="container">
@@ -27,12 +57,17 @@ const FileSearch = ({ title, onFileSearch }) => {
           <input
             className="col-span-2 p-1 rounded-lg focus:outline-none focus:ring focus:border-blue-500"
             type="text"
+            ref={node}
             value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+            }}
           ></input>
           <button
             className="col-span-1"
             onClick={() => {
               setInputActive(false);
+              setValue('');
             }}
           >
             <i className="iconfont icon-close"></i>
