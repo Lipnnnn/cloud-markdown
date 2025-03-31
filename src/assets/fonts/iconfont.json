@@ -6,6 +6,41 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "34452956",
+      "name": "add",
+      "font_class": "add",
+      "unicode": "e835",
+      "unicode_decimal": 59445
+    },
+    {
+      "icon_id": "34453354",
+      "name": "全球E站发品",
+      "font_class": "quanqiuEzhanfapin",
+      "unicode": "e87b",
+      "unicode_decimal": 59515
+    },
+    {
+      "icon_id": "34452776",
+      "name": "business-MY bank",
+      "font_class": "a-business-MYbank",
+      "unicode": "e824",
+      "unicode_decimal": 59428
+    },
+    {
+      "icon_id": "34452981",
+      "name": "edit",
+      "font_class": "edit",
+      "unicode": "e83a",
+      "unicode_decimal": 59450
+    },
+    {
+      "icon_id": "34452990",
+      "name": "delete",
+      "font_class": "delete",
+      "unicode": "e83b",
+      "unicode_decimal": 59451
+    },
+    {
       "icon_id": "34452988",
       "name": "close",
       "font_class": "close",

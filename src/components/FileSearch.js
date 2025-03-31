@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import useKeyPress from '../hooks/useKeyPress.js';
 
 /**
  * FileSearch组件，是左上角用于搜索文件的组件
@@ -11,21 +12,23 @@ const FileSearch = ({ title, onFileSearch }) => {
   const [inputActive, setInputActive] = useState(false);
   // 输入框的值
   const [value, setValue] = useState('');
+  // 监听esc键
+  const escPressed = useKeyPress('Escape');
+  // 监听enter键
+  const enterPressed = useKeyPress('Enter');
   // 表示输入框这个dom节点，在这里是用于自动获取焦点
   let node = useRef(null);
 
   useEffect(() => {
     // 监听输入框的回车事件
-    const handleInputEvent = (e) => {
-      if (e.key === 'Enter' && inputActive) {
-        onFileSearch(value);
-      }
-    };
-    document.addEventListener('keyup', handleInputEvent);
-    // 组件卸载时，移除监听
-    return () => {
-      document.removeEventListener('keyup', handleInputEvent);
-    };
+    if (enterPressed && inputActive) {
+      onFileSearch(value);
+    }
+    // 监听esc键的事件
+    if (escPressed && inputActive) {
+      setInputActive(false);
+      setValue('');
+    }
   });
 
   useEffect(() => {
