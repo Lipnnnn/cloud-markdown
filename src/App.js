@@ -2,6 +2,7 @@ import FileSearch from './components/FileSearch.js';
 import FileList from './components/FileList.js';
 import defaultFiles from './utils/defaultFiles.js';
 import LeftButton from './components/LeftButton.js';
+import TabList from './components/TabList.js';
 
 function App() {
   return (
@@ -40,8 +41,15 @@ function App() {
           />
         </div>
       </div>
-      <div className="col-span-3 p-4 bg-sky-500">
-        <h1>this is right</h1>
+      <div className="col-span-3">
+        {/* <h1>this is right</h1> */}
+        <TabList
+          files={defaultFiles}
+          activeId="1"
+          unsaveIds={['1', '2']}
+          onTabClick={(id) => console.log('click', id)}
+          onCloseTab={(id) => console.log('close', id)}
+        />
       </div>
     </div>
   );
