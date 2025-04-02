@@ -1,8 +1,21 @@
+import React from 'react';
+import SimpleMDE from 'react-simplemde-editor';
+import { marked } from 'marked';
+import 'easymde/dist/easymde.min.css';
+import './assets/styles/markdown.css';  // 添加这行
 import FileSearch from './components/FileSearch.js';
 import FileList from './components/FileList.js';
 import defaultFiles from './utils/defaultFiles.js';
 import LeftButton from './components/LeftButton.js';
 import TabList from './components/TabList.js';
+
+// 配置 marked
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+  headerIds: true,
+  xhtml: true
+});
 
 function App() {
   return (
@@ -49,6 +62,30 @@ function App() {
           unsaveIds={['1', '2']}
           onTabClick={(id) => console.log('click', id)}
           onCloseTab={(id) => console.log('close', id)}
+        />
+        <SimpleMDE
+          value={defaultFiles[0].body}
+          onChange={(value) => {
+            console.log(value);
+          }}
+          options={{
+            minHeight: '500px',
+            spellChecker: false,
+            status: false,
+            toolbar: [
+              'bold', 'italic', 'heading', '|',
+              'quote', 'unordered-list', 'ordered-list', '|',
+              'link', 'image', '|',
+              'preview', 'side-by-side', 'fullscreen'
+            ],
+            previewRender: (plainText) => {
+              return marked.parse(plainText, {
+                headerIds: true,
+                mangle: false
+              });
+            },
+            sideBySideFullscreen: false
+          }}
         />
       </div>
     </div>
