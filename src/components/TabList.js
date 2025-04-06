@@ -24,7 +24,7 @@ const TabList = ({ files, activeId, unsaveIds, onTabClick, onCloseTab }) => {
         return (
           <li
             key={file.id}
-            className={`w-[100px] px-4 py-2 transition-all cursor-pointer flex items-center justify-between ${
+            className={`px-4 py-2 transition-all cursor-pointer flex items-center justify-between ${
               activeId === file.id
                 ? 'bg-indigo-500 text-white'
                 : 'bg-white text-indigo-600 hover:text-black hover:bg-indigo-200'
