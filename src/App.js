@@ -1,6 +1,7 @@
 import React, { use, useState, useMemo } from 'react';
 import SimpleMDE from 'react-simplemde-editor';
 import { marked } from 'marked';
+import { v4 as uuidv4 } from 'uuid';
 import 'easymde/dist/easymde.min.css';
 import './assets/styles/markdown.css'; // 添加这行
 import FileSearch from './components/FileSearch.js';
@@ -20,6 +21,8 @@ marked.setOptions({
 function App() {
   // 初始需要展示在左侧的文件列表
   const [files, setFiles] = useState(defaultFiles);
+  // 搜索列表文件
+  const [searchFiles, setSearchFiles] = useState([]);
   // 当前激活的文件id
   const [activeFileId, setActiveFileId] = useState('');
   // 打开的文件列表，展示在右侧面板上部的文件
@@ -86,6 +89,69 @@ function App() {
     }
   };
 
+  // 删除文件
+  const fileDelete = (id) => {
+    const withoutFileIds = files.filter((file) => {
+      return file.id !== id;
+    });
+    setFiles(withoutFileIds);
+    // 如果当前被激活的文件被关闭了，就设置一个默认的被激活的文件
+    if (!withoutFileIds.includes(activeFileId)) {
+      if (withoutFileIds.length <= 0) {
+        setActiveFileId('');
+      } else {
+        // 设置一个默认被激活的文件
+        setActiveFileId(withoutFileIds[0].id);
+      }
+    }
+  };
+
+  // 保存文件
+  const saveEdit = (id, value) => {
+    const newFiles = files.map((file) => {
+      if (file.id === id) {
+        file.title = value;
+        file.isNew = false;
+      }
+      return file;
+    });
+    setFiles(newFiles);
+    // 从未保存文件列表中移除
+    const withoutUnsavedIds = unsavedFileIds.filter((fileId) => {
+      return fileId !== id;
+    });
+    setUnsavedFileIds(withoutUnsavedIds);
+  };
+
+  // 文件搜索
+  const fileSearch = (value) => {
+    if (!value || value.trim() === '') {
+      setSearchFiles([]);
+    } else {
+      const newFiles = files.filter((file) => {
+        return file.title.toLowerCase().includes(value.toLowerCase());
+      });
+      setSearchFiles(newFiles);
+    }
+  };
+
+  // 新建文件
+  // 修改 createNewFile 函数
+  const createNewFile = () => {
+    const newID = uuidv4(); // 使用 uuidv4 而不是 uuid.v4
+    const newFile = [
+      ...files,
+      {
+        id: newID,
+        title: '',
+        body: '## 请输入 Markdown',
+        createdAt: Date.now(),
+        isNew: true,
+      },
+    ];
+    setFiles(newFile);
+  };
+
   const editorOptions = useMemo(() => {
     return {
       minHeight: '500px',
@@ -121,19 +187,14 @@ function App() {
     <div className="grid grid-cols-4">
       <div className="col-span-1 h-screen flex flex-col">
         <div className="bg-indigo-500 min-h-12 flex items-center p-2">
-          <FileSearch
-            title="我的云文档"
-            onFileSearch={(value) => {
-              console.log(value);
-            }}
-          />
+          <FileSearch title="我的云文档" onFileSearch={fileSearch} />
         </div>
         <div className="flex-1 overflow-auto">
           <FileList
-            files={files}
+            files={searchFiles.length > 0 ? searchFiles : files}
             onFileClick={fileClick}
-            onFileDelete={(id) => console.log('delete', id)}
-            onSaveEdit={(id, value) => console.log('save', id, value)}
+            onFileDelete={fileDelete}
+            onSaveEdit={saveEdit}
           />
         </div>
         <div className="grid grid-cols-2 mt-auto">
@@ -141,9 +202,7 @@ function App() {
             text="新建"
             icon="icon-add"
             colorClass="bg-indigo-500 py-3"
-            onBtnClick={() => {
-              console.log('新建文件');
-            }}
+            onBtnClick={createNewFile}
           />
           <LeftButton
             text="导入"

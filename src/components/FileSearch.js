@@ -71,6 +71,7 @@ const FileSearch = ({ title, onFileSearch }) => {
             onClick={() => {
               setInputActive(false);
               setValue('');
+              onFileSearch(''); 
             }}
           >
             <i className="iconfont icon-close"></i>
