@@ -2,6 +2,7 @@ import React, { use, useState, useMemo } from 'react';
 import SimpleMDE from 'react-simplemde-editor';
 import { marked } from 'marked';
 import { v4 as uuidv4 } from 'uuid';
+import fileHelper from './utils/fileHelper.js';
 import 'easymde/dist/easymde.min.css';
 import './assets/styles/markdown.css'; // 添加这行
 import FileSearch from './components/FileSearch.js';
@@ -9,6 +10,9 @@ import FileList from './components/FileList.js';
 import defaultFiles from './utils/defaultFiles.js';
 import LeftButton from './components/LeftButton.js';
 import TabList from './components/TabList.js';
+
+const { join } = require('@electron/remote').require('path');
+const remote = require('@electron/remote');
 
 // 配置 marked
 marked.setOptions({
@@ -29,6 +33,9 @@ function App() {
   const [openedFileIds, setOpenedFileIds] = useState([]);
   // 未保存的文件列表
   const [unsavedFileIds, setUnsavedFileIds] = useState([]);
+
+  // 保存文件的位置
+  const savedLocation = 'D:\\cloud-markdown-docs';
 
   const openedFiles = openedFileIds.map((openId) => {
     return files.find((file) => {
@@ -107,7 +114,7 @@ function App() {
   };
 
   // 保存文件
-  const saveEdit = (id, value) => {
+  const saveEdit = (id, value, isNew) => {
     const newFiles = files.map((file) => {
       if (file.id === id) {
         file.title = value;
@@ -115,7 +122,17 @@ function App() {
       }
       return file;
     });
-    setFiles(newFiles);
+    const saveFile = files.find((file) => {
+      return file.id === id;
+    });
+    if (isNew) {
+      fileHelper
+        .writeFile(join(savedLocation, `${value}.md`), saveFile.body)
+        .then(() => {
+          setFiles(newFiles);
+        });
+    } else {
+    }
     // 从未保存文件列表中移除
     const withoutUnsavedIds = unsavedFileIds.filter((fileId) => {
       return fileId !== id;

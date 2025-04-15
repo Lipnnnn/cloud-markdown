@@ -31,7 +31,7 @@ const FileList = ({ files, onFileClick, onSaveEdit, onFileDelete }) => {
     const editItem = files.find((file) => file.id === editStatus);
     // 监听输入框的回车事件
     if (enterPressed && editStatus && value.trim() !== '') {
-      onSaveEdit(editItem.id, value);
+      onSaveEdit(editItem.id, value, editItem.isNew);
       closeSearch(editItem);
     }
   });
