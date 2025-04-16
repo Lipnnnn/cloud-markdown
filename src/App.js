@@ -11,8 +11,25 @@ import defaultFiles from './utils/defaultFiles.js';
 import LeftButton from './components/LeftButton.js';
 import TabList from './components/TabList.js';
 
-const { join } = require('@electron/remote').require('path');
 const remote = require('@electron/remote');
+const { join } = require('@electron/remote').require('path');
+const Store = require('@electron/remote').require('electron-store');
+
+const fileStore = new Store({ name: 'Files Data' });
+
+// 持久化文件列表数据
+const saveFilesToStore = (files) => {
+  // 只需要保存文件的id、title、path、createdAt属性 不需要保存文件的 isNew 、body 属性
+  const filesStore = files.map((file) => {
+    return {
+      id: file.id,
+      title: file.title,
+      path: file.path,
+      createdAt: file.createdAt,
+    };
+  });
+  fileStore.set('files', filesStore);
+};
 
 // 配置 marked
 marked.setOptions({
@@ -24,7 +41,7 @@ marked.setOptions({
 
 function App() {
   // 初始需要展示在左侧的文件列表
-  const [files, setFiles] = useState(defaultFiles);
+  const [files, setFiles] = useState(fileStore.get('files') || []);
   // 搜索列表文件
   const [searchFiles, setSearchFiles] = useState([]);
   // 当前激活的文件id
@@ -49,6 +66,22 @@ function App() {
 
   // 点击左侧的文件列表中的某一个文件
   const fileClick = (id) => {
+    const currentFile = files.find((file) => {
+      return file.id === id;
+    });
+    if (!currentFile.isLoaded) {
+      fileHelper.readFile(currentFile.path).then((content) => {
+        const newFiles = files.map((file) => {
+          if (file.id === id) {
+            file.body = content;
+            file.isLoaded = true;
+          }
+          return file;
+        });
+        setFiles(newFiles);
+      });
+    }
+
     // 将该文件添加进 打开的文件 列表
     if (!openedFileIds.includes(id)) {
       setOpenedFileIds([...openedFileIds, id]);
@@ -98,12 +131,24 @@ function App() {
 
   // 删除文件
   const fileDelete = (id) => {
+    const deleteFile = files.find((file) => {
+      return file.id === id;
+    });
     const withoutFileIds = files.filter((file) => {
       return file.id !== id;
     });
-    setFiles(withoutFileIds);
+
+    if (deleteFile.isNew) {
+      setFiles(withoutFileIds);
+    } else {
+      fileHelper.deleteFile(deleteFile.path).then(() => {
+        setFiles(withoutFileIds);
+        saveFilesToStore(withoutFileIds);
+        closeTab(id);
+      });
+    }
     // 如果当前被激活的文件被关闭了，就设置一个默认的被激活的文件
-    if (!withoutFileIds.includes(activeFileId)) {
+    if (id === activeFileId && !withoutFileIds.includes(activeFileId)) {
       if (withoutFileIds.length <= 0) {
         setActiveFileId('');
       } else {
@@ -113,25 +158,56 @@ function App() {
     }
   };
 
-  // 保存文件
+  // 保存当前激活（正在修改）的文件
+  const saveCurrentFile = () => {
+    fileHelper
+      .writeFile(join(savedLocation, `${activeFile.title}.md`), activeFile.body)
+      .then(() => {
+        // 从未保存文件列表中移除
+        const withoutUnsavedIds = unsavedFileIds.filter((fileId) => {
+          return fileId !== activeFileId;
+        });
+        setUnsavedFileIds(withoutUnsavedIds);
+      });
+  };
+
+  // 新建文件和修改文件名称
   const saveEdit = (id, value, isNew) => {
+    const saveFile = files.find((file) => {
+      return file.id === id;
+    });
+    const oldTitle = saveFile.title;
+
     const newFiles = files.map((file) => {
       if (file.id === id) {
         file.title = value;
         file.isNew = false;
+        file.path = join(savedLocation, `${value}.md`);
       }
       return file;
     });
-    const saveFile = files.find((file) => {
-      return file.id === id;
-    });
+
     if (isNew) {
+      // 新建文件
       fileHelper
         .writeFile(join(savedLocation, `${value}.md`), saveFile.body)
         .then(() => {
           setFiles(newFiles);
+          // 持久化文件列表数据
+          saveFilesToStore(newFiles);
         });
     } else {
+      // 编辑修改文件名称
+      fileHelper
+        .renameFile(
+          join(savedLocation, `${oldTitle}.md`),
+          join(savedLocation, `${value}.md`),
+        )
+        .then(() => {
+          setFiles(newFiles);
+          // 持久化文件列表数据
+          saveFilesToStore(newFiles);
+        });
     }
     // 从未保存文件列表中移除
     const withoutUnsavedIds = unsavedFileIds.filter((fileId) => {
@@ -252,6 +328,12 @@ function App() {
               value={activeFile.body}
               onChange={changeFile}
               options={editorOptions}
+            />
+            <LeftButton
+              text="保存"
+              icon="icon-quanqiuEzhanfapin"
+              colorClass="bg-indigo-200 py-3"
+              onBtnClick={saveCurrentFile}
             />
           </>
         )}
