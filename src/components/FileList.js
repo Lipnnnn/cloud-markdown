@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import useKeyPress from '../hooks/useKeyPress.js';
+import useContextMenu from '../hooks/useContextMenu.js';
+import { getParentNode } from '../utils/helper.js';
 
 /**
  * FileList组件，是左侧的文件列表组件
@@ -26,6 +28,33 @@ const FileList = ({ files, onFileClick, onSaveEdit, onFileDelete }) => {
     }
   };
 
+  const clickedItem = useContextMenu(
+    [
+      {
+        label: '打开',
+        click: () => {
+          const parentElement = getParentNode(clickedItem.current, 'file-item');
+          if (parentElement) {
+            onFileClick(parentElement.dataset.id);
+          }
+        },
+      },
+      {
+        label: '重命名',
+        click: () => {
+          console.log('重命名');
+        },
+      },
+      {
+        label: '删除',
+        click: () => {
+          console.log('删除');
+        },
+      },
+    ],
+    '.file-list',
+  );
+
   useEffect(() => {
     // 找到当前处于编辑状态的文件
     const editItem = files.find((file) => file.id === editStatus);
@@ -51,12 +80,14 @@ const FileList = ({ files, onFileClick, onSaveEdit, onFileDelete }) => {
   });
 
   return (
-    <ul className="w-full max-w-sm bg-white shadow-lg rounded-lg">
+    <ul className="w-full max-w-sm bg-white shadow-lg rounded-lg file-list">
       {files.map((file) => {
         return (
           <li
-            className="grid grid-cols-8 items-center p-2 border-b last:border-b-0 hover:bg-gray-100"
+            className="file-item grid grid-cols-8 items-center p-2 border-b last:border-b-0 hover:bg-gray-100"
             key={file.id}
+            data-id={file.id}
+            data-title={file.title}
           >
             {
               // 非编辑状态下，展示文件名

@@ -1,4 +1,4 @@
-import React, { use, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import SimpleMDE from 'react-simplemde-editor';
 import { marked } from 'marked';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,15 +7,19 @@ import 'easymde/dist/easymde.min.css';
 import './assets/styles/markdown.css'; // 添加这行
 import FileSearch from './components/FileSearch.js';
 import FileList from './components/FileList.js';
-import defaultFiles from './utils/defaultFiles.js';
 import LeftButton from './components/LeftButton.js';
 import TabList from './components/TabList.js';
+import useIpcRenderer from './hooks/useIpcRenderer.js';
 
 const remote = require('@electron/remote');
-const { join } = require('@electron/remote').require('path');
+// 引入ipcRenderer模块
+const { ipcRenderer } = require('electron');
+const { join, basename, extname, dirname } =
+  require('@electron/remote').require('path');
 const Store = require('@electron/remote').require('electron-store');
 
 const fileStore = new Store({ name: 'Files Data' });
+const settingsStore = new Store({ name: 'Settings' });
 
 // 持久化文件列表数据
 const saveFilesToStore = (files) => {
@@ -52,7 +56,8 @@ function App() {
   const [unsavedFileIds, setUnsavedFileIds] = useState([]);
 
   // 保存文件的位置
-  const savedLocation = 'D:\\cloud-markdown-docs';
+  const savedLocation =
+    settingsStore.get('savedFileLocation') || remote.app.getPath('documents');
 
   const openedFiles = openedFileIds.map((openId) => {
     return files.find((file) => {
@@ -160,15 +165,13 @@ function App() {
 
   // 保存当前激活（正在修改）的文件
   const saveCurrentFile = () => {
-    fileHelper
-      .writeFile(join(savedLocation, `${activeFile.title}.md`), activeFile.body)
-      .then(() => {
-        // 从未保存文件列表中移除
-        const withoutUnsavedIds = unsavedFileIds.filter((fileId) => {
-          return fileId !== activeFileId;
-        });
-        setUnsavedFileIds(withoutUnsavedIds);
+    fileHelper.writeFile(activeFile.path, activeFile.body).then(() => {
+      // 从未保存文件列表中移除
+      const withoutUnsavedIds = unsavedFileIds.filter((fileId) => {
+        return fileId !== activeFileId;
       });
+      setUnsavedFileIds(withoutUnsavedIds);
+    });
   };
 
   // 新建文件和修改文件名称
@@ -176,38 +179,34 @@ function App() {
     const saveFile = files.find((file) => {
       return file.id === id;
     });
-    const oldTitle = saveFile.title;
+    const oldPath = saveFile.path;
+    const newPath = isNew
+      ? join(savedLocation, `${value}.md`)
+      : join(dirname(saveFile.path), `${value}.md`);
 
     const newFiles = files.map((file) => {
       if (file.id === id) {
         file.title = value;
         file.isNew = false;
-        file.path = join(savedLocation, `${value}.md`);
+        file.path = newPath;
       }
       return file;
     });
 
     if (isNew) {
       // 新建文件
-      fileHelper
-        .writeFile(join(savedLocation, `${value}.md`), saveFile.body)
-        .then(() => {
-          setFiles(newFiles);
-          // 持久化文件列表数据
-          saveFilesToStore(newFiles);
-        });
+      fileHelper.writeFile(newPath, saveFile.body).then(() => {
+        setFiles(newFiles);
+        // 持久化文件列表数据
+        saveFilesToStore(newFiles);
+      });
     } else {
       // 编辑修改文件名称
-      fileHelper
-        .renameFile(
-          join(savedLocation, `${oldTitle}.md`),
-          join(savedLocation, `${value}.md`),
-        )
-        .then(() => {
-          setFiles(newFiles);
-          // 持久化文件列表数据
-          saveFilesToStore(newFiles);
-        });
+      fileHelper.renameFile(oldPath, newPath).then(() => {
+        setFiles(newFiles);
+        // 持久化文件列表数据
+        saveFilesToStore(newFiles);
+      });
     }
     // 从未保存文件列表中移除
     const withoutUnsavedIds = unsavedFileIds.filter((fileId) => {
@@ -229,9 +228,8 @@ function App() {
   };
 
   // 新建文件
-  // 修改 createNewFile 函数
   const createNewFile = () => {
-    const newID = uuidv4(); // 使用 uuidv4 而不是 uuid.v4
+    const newID = uuidv4();
     const newFile = [
       ...files,
       {
@@ -244,6 +242,49 @@ function App() {
     ];
     setFiles(newFile);
   };
+
+  // 导入文件
+  const importFiles = async () => {
+    const result = await remote.dialog.showOpenDialog({
+      title: '选择导入的 Markdown 文件',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Markdown files', extensions: ['md'] }],
+    });
+
+    if (Array.isArray(result.filePaths)) {
+      // 拿到过滤后的文件，也就是还没有被打开的文件
+      const filterFiles = result.filePaths.filter((path) => {
+        return !files.find((file) => file.path === path);
+      });
+      // 根据文件路径生成文件列表
+      const importFilesArr = filterFiles.map((path) => {
+        return {
+          id: uuidv4(),
+          title: basename(path, extname(path)),
+          path,
+        };
+      });
+      // 拿到新的需要展示在左侧面板的文件列表
+      const newFiles = [...files, ...importFilesArr];
+      setFiles(newFiles);
+      // 持久化文件列表数据
+      saveFilesToStore(newFiles);
+      if (importFilesArr.length > 0) {
+        remote.dialog.showMessageBox({
+          type: 'info',
+          title: '导入成功',
+          message: '导入成功',
+          detail: `成功导入 ${importFilesArr.length} 个文件`,
+        });
+      }
+    }
+  };
+
+  useIpcRenderer({
+    'create-new-file': createNewFile,
+    'import-file': importFiles,
+    'save-edit-file': saveCurrentFile,
+  });
 
   const editorOptions = useMemo(() => {
     return {
@@ -301,9 +342,7 @@ function App() {
             text="导入"
             icon="icon-quanqiuEzhanfapin"
             colorClass="bg-indigo-200 py-3"
-            onBtnClick={() => {
-              console.log('导入文件');
-            }}
+            onBtnClick={importFiles}
           />
         </div>
       </div>
@@ -328,12 +367,6 @@ function App() {
               value={activeFile.body}
               onChange={changeFile}
               options={editorOptions}
-            />
-            <LeftButton
-              text="保存"
-              icon="icon-quanqiuEzhanfapin"
-              colorClass="bg-indigo-200 py-3"
-              onBtnClick={saveCurrentFile}
             />
           </>
         )}
