@@ -3,6 +3,7 @@ import SimpleMDE from 'react-simplemde-editor';
 import { marked } from 'marked';
 import { v4 as uuidv4 } from 'uuid';
 import fileHelper from './utils/fileHelper.js';
+import { timestampToString } from './utils/helper.js';
 import 'easymde/dist/easymde.min.css';
 import './assets/styles/markdown.css'; // 添加这行
 import FileSearch from './components/FileSearch.js';
@@ -10,6 +11,7 @@ import FileList from './components/FileList.js';
 import LeftButton from './components/LeftButton.js';
 import TabList from './components/TabList.js';
 import useIpcRenderer from './hooks/useIpcRenderer.js';
+import Loader from './components/Loader.js';
 
 const remote = require('@electron/remote');
 // 引入ipcRenderer模块
@@ -21,6 +23,11 @@ const Store = require('@electron/remote').require('electron-store');
 const fileStore = new Store({ name: 'Files Data' });
 const settingsStore = new Store({ name: 'Settings' });
 
+const getAutoSync = () =>
+  ['AccessKey', 'SecretKey', 'Bucket', 'enableAutoSync'].every((key) => {
+    return !!settingsStore.get(key);
+  });
+
 // 持久化文件列表数据
 const saveFilesToStore = (files) => {
   // 只需要保存文件的id、title、path、createdAt属性 不需要保存文件的 isNew 、body 属性
@@ -30,6 +37,8 @@ const saveFilesToStore = (files) => {
       title: file.title,
       path: file.path,
       createdAt: file.createdAt,
+      isSynced: file.isSynced,
+      updateAt: file.updateAt,
     };
   });
   fileStore.set('files', filesStore);
@@ -54,6 +63,7 @@ function App() {
   const [openedFileIds, setOpenedFileIds] = useState([]);
   // 未保存的文件列表
   const [unsavedFileIds, setUnsavedFileIds] = useState([]);
+  const [isLoading, setLoading] = useState(false);
 
   // 保存文件的位置
   const savedLocation =
@@ -74,17 +84,23 @@ function App() {
     const currentFile = files.find((file) => {
       return file.id === id;
     });
-    if (!currentFile.isLoaded) {
-      fileHelper.readFile(currentFile.path).then((content) => {
-        const newFiles = files.map((file) => {
-          if (file.id === id) {
-            file.body = content;
-            file.isLoaded = true;
-          }
-          return file;
+    const { title, path, isLoaded } = currentFile;
+    if (!isLoaded) {
+      if (getAutoSync()) {
+        // 自动同步
+        ipcRenderer.send('download-file', { key: `${title}.md`, path, id });
+      } else {
+        fileHelper.readFile(path).then((content) => {
+          const newFiles = files.map((file) => {
+            if (file.id === id) {
+              file.body = content;
+              file.isLoaded = true;
+            }
+            return file;
+          });
+          setFiles(newFiles);
         });
-        setFiles(newFiles);
-      });
+      }
     }
 
     // 将该文件添加进 打开的文件 列表
@@ -165,12 +181,17 @@ function App() {
 
   // 保存当前激活（正在修改）的文件
   const saveCurrentFile = () => {
-    fileHelper.writeFile(activeFile.path, activeFile.body).then(() => {
+    const { path, body, title } = activeFile;
+    fileHelper.writeFile(path, body).then(() => {
       // 从未保存文件列表中移除
       const withoutUnsavedIds = unsavedFileIds.filter((fileId) => {
         return fileId !== activeFileId;
       });
       setUnsavedFileIds(withoutUnsavedIds);
+      if (getAutoSync()) {
+        // 自动同步
+        ipcRenderer.send('upload-file', { key: `${title}.md`, path });
+      }
     });
   };
 
@@ -280,10 +301,77 @@ function App() {
     }
   };
 
+  const activeFileUploaded = () => {
+    // 更新文件列表
+    const newFiles = files.map((file) => {
+      if (file.id === activeFileId) {
+        file.isSynced = true;
+        file.updateAt = new Date().getTime();
+      }
+      return file;
+    });
+    setFiles(newFiles);
+    // 持久化文件列表数据
+    saveFilesToStore(newFiles);
+  };
+
+  const activeFileDownloaded = (event, message) => {
+    const currentFile = files.find((file) => {
+      return file.id === message.id;
+    });
+    const { id, path } = currentFile;
+    fileHelper.readFile(path).then((value) => {
+      let newFile;
+      if (message.status === 'download-success') {
+        newFile = {
+          ...currentFile,
+          body: value,
+          isLoaded: true,
+          isSynced: true,
+          updateAt: new Date().getTime(),
+        };
+      } else {
+        newFile = {
+          ...currentFile,
+          body: value,
+          isLoaded: true,
+        };
+      }
+      const newFiles = files.map((file) => {
+        if (file.id === id) {
+          return newFile;
+        }
+        return file;
+      });
+      setFiles(newFiles);
+      // 持久化文件列表数据
+      saveFilesToStore(newFiles);
+    });
+  };
+
+  const filesUploaded = () => {
+    const newFiles = files.map((file) => {
+      return {
+        ...file,
+        isSynced: true,
+        updateAt: new Date().getTime(),
+      };
+    });
+    setFiles(newFiles);
+    // 持久化文件列表数据
+    saveFilesToStore(newFiles);
+  };
+
   useIpcRenderer({
     'create-new-file': createNewFile,
     'import-file': importFiles,
     'save-edit-file': saveCurrentFile,
+    'active-file-uploaded': activeFileUploaded,
+    'file-downloaded': activeFileDownloaded,
+    'loading-status': (message, status) => {
+      setLoading(status);
+    },
+    'files-uploaded': filesUploaded,
   });
 
   const editorOptions = useMemo(() => {
@@ -319,6 +407,7 @@ function App() {
 
   return (
     <div className="grid grid-cols-4">
+      {isLoading && <Loader />}
       <div className="col-span-1 h-screen flex flex-col">
         <div className="bg-indigo-500 min-h-12 flex items-center p-2">
           <FileSearch title="我的云文档" onFileSearch={fileSearch} />
@@ -368,6 +457,11 @@ function App() {
               onChange={changeFile}
               options={editorOptions}
             />
+            {activeFile.isSynced && (
+              <span>
+                已同步，上次同步{timestampToString(activeFile.updateAt)}
+              </span>
+            )}
           </>
         )}
       </div>
