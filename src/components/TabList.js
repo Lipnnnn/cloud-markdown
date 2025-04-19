@@ -15,12 +15,12 @@ const TabList = ({ files, activeId, unsaveIds, onTabClick, onCloseTab }) => {
   const [hoveredId, setHoveredId] = useState(null);
 
   return (
-    <ul className="flex">
+    <ul className="flex min-h-12 bg-gray-50">
       {files.map((file) => {
         // 判断文件是否未保存
         const unSaveFile = unsaveIds.includes(file.id);
         const isHovered = hoveredId === file.id;
-        
+
         return (
           <li
             key={file.id}

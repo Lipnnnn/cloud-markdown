@@ -375,20 +375,25 @@ function App() {
   };
 
   const filesDownloaded = (event, newFiles) => {
-      // 合并现有文件和新下载的文件
-      const mergedFiles = [...files];
-      newFiles.forEach(newFile => {
-        const existingFileIndex = mergedFiles.findIndex(file => file.title === newFile.title);
-        if (existingFileIndex === -1) {
-          mergedFiles.push(newFile);
-        } else {
-          mergedFiles[existingFileIndex] = { ...mergedFiles[existingFileIndex], ...newFile };
-        }
-      });
-      
-      setFiles(mergedFiles);
-      saveFilesToStore(mergedFiles);
-    };
+    // 合并现有文件和新下载的文件
+    const mergedFiles = [...files];
+    newFiles.forEach((newFile) => {
+      const existingFileIndex = mergedFiles.findIndex(
+        (file) => file.title === newFile.title,
+      );
+      if (existingFileIndex === -1) {
+        mergedFiles.push(newFile);
+      } else {
+        mergedFiles[existingFileIndex] = {
+          ...mergedFiles[existingFileIndex],
+          ...newFile,
+        };
+      }
+    });
+
+    setFiles(mergedFiles);
+    saveFilesToStore(mergedFiles);
+  };
 
   useIpcRenderer({
     'create-new-file': createNewFile,
@@ -405,9 +410,10 @@ function App() {
 
   const editorOptions = useMemo(() => {
     return {
-      minHeight: '500px',
       spellChecker: false,
       status: false,
+      autofocus: true,
+      autoRefresh: true,
       toolbar: [
         'bold',
         'italic',
@@ -473,7 +479,7 @@ function App() {
           </div>
         )}
         {activeFile && (
-          <>
+          <div className="h-screen flex flex-col">
             <TabList
               files={openedFiles}
               activeId={activeFileId}
@@ -481,17 +487,49 @@ function App() {
               onTabClick={tabClick}
               onCloseTab={closeTab}
             />
-            <SimpleMDE
-              value={activeFile.body}
-              onChange={changeFile}
-              options={editorOptions}
-            />
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <SimpleMDE
+                key={activeFile.id}
+                value={activeFile.body}
+                onChange={changeFile}
+                options={{
+                  ...editorOptions,
+                  toolbar: [
+                    {
+                      name: 'bold',
+                      className: 'sticky-toolbar',
+                    },
+                    'italic',
+                    'heading',
+                    '|',
+                    'quote',
+                    'unordered-list',
+                    'ordered-list',
+                    '|',
+                    'link',
+                    'image',
+                    '|',
+                    'preview',
+                    'side-by-side',
+                    'fullscreen',
+                  ],
+                  previewRender: (plainText) => {
+                    return marked.parse(plainText, {
+                      headerIds: true,
+                      mangle: false,
+                    });
+                  },
+                  sideBySideFullscreen: false,
+                }}
+                className="h-full flex flex-col"
+              />
+            </div>
             {activeFile.isSynced && (
-              <span>
+              <div className="h-[50px] flex items-center px-4 bg-gray-100 text-gray-600">
                 已同步，上次同步{timestampToString(activeFile.updateAt)}
-              </span>
+              </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

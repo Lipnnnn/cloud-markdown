@@ -42,13 +42,20 @@ const FileList = ({ files, onFileClick, onSaveEdit, onFileDelete }) => {
       {
         label: '重命名',
         click: () => {
-          console.log('重命名');
+          const parentElement = getParentNode(clickedItem.current, 'file-item');
+          if (parentElement) {
+            setEditStatus(parentElement.dataset.id);
+            setValue(parentElement.dataset.title);
+          }
         },
       },
       {
         label: '删除',
         click: () => {
-          console.log('删除');
+          const parentElement = getParentNode(clickedItem.current, 'file-item');
+          if (parentElement) {
+            onFileDelete(parentElement.dataset.id);
+          }
         },
       },
     ],
@@ -80,7 +87,7 @@ const FileList = ({ files, onFileClick, onSaveEdit, onFileDelete }) => {
   });
 
   return (
-    <ul className="w-full max-w-sm bg-white shadow-lg rounded-lg file-list">
+    <ul className="w-full h-full max-w-sm bg-white shadow-lg rounded-lg file-list">
       {files.map((file) => {
         return (
           <li
@@ -102,19 +109,6 @@ const FileList = ({ files, onFileClick, onSaveEdit, onFileDelete }) => {
                   >
                     {file.title}
                   </span>
-                  <i
-                    className="col-span-1 iconfont icon-edit"
-                    onClick={() => {
-                      setEditStatus(file.id);
-                      setValue(file.title);
-                    }}
-                  ></i>
-                  <i
-                    className="col-span-1 iconfont icon-delete"
-                    onClick={() => {
-                      onFileDelete(file.id);
-                    }}
-                  ></i>
                 </>
               )
             }
@@ -123,7 +117,7 @@ const FileList = ({ files, onFileClick, onSaveEdit, onFileDelete }) => {
               (editStatus === file.id || file.isNew) && (
                 <>
                   <input
-                    className="col-span-6 p-1 rounded-lg focus:outline-none focus:ring focus:border-blue-500"
+                    className="col-span-6 px-2 py-1 text-sm bg-transparent border-b border-gray-300 focus:border-indigo-500 focus:outline-none transition-colors duration-200"
                     type="text"
                     value={value}
                     placeholder="请输入文件名"
@@ -131,7 +125,7 @@ const FileList = ({ files, onFileClick, onSaveEdit, onFileDelete }) => {
                     onChange={(e) => {
                       setValue(e.target.value);
                     }}
-                  ></input>
+                  />
                   <button
                     className="col-span-2"
                     onClick={() => closeSearch(file)}
