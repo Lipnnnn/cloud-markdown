@@ -167,6 +167,14 @@ app.on('ready', () => {
     });
   });
 
+  ipcMain.on('rename-file', (event, data) => {
+      const manager = createManager();
+      manager.renameFile(data.oldKey, data.newKey).then(() => {
+        event.reply('file-renamed');
+      }).catch(() => {
+        dialog.showErrorBox('重命名失败', '请检查七牛云配置参数是否正确');
+      });
+    });
   // 在创建窗口后启用
   require('@electron/remote/main').enable(mainWindow.webContents);
 });

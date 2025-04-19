@@ -130,6 +130,19 @@ class QiniuManager {
       }
     };
   }
+
+  renameFile(oldKey, newKey) {
+      return new Promise((resolve, reject) => {
+        this.bucketManager.move(
+          this.bucket,
+          oldKey,
+          this.bucket,
+          newKey,
+          { force: true },
+          this._handleCallback(resolve, reject)
+        );
+      });
+    }
 }
 
 module.exports = QiniuManager;

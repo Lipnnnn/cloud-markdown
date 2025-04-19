@@ -166,7 +166,7 @@ function App() {
         // 如果开启了自动同步，发送删除云端文件的消息
         if (getAutoSync()) {
           ipcRenderer.send('delete-file', {
-            key: `${deleteFile.title}.md`
+            key: `${deleteFile.title}.md`,
           });
         }
         setFiles(withoutFileIds);
@@ -207,6 +207,7 @@ function App() {
       return file.id === id;
     });
     const oldPath = saveFile.path;
+    const oldTitle = saveFile.title;
     const newPath = isNew
       ? join(savedLocation, `${value}.md`)
       : join(dirname(saveFile.path), `${value}.md`);
@@ -224,14 +225,19 @@ function App() {
       // 新建文件
       fileHelper.writeFile(newPath, saveFile.body).then(() => {
         setFiles(newFiles);
-        // 持久化文件列表数据
         saveFilesToStore(newFiles);
       });
     } else {
       // 编辑修改文件名称
       fileHelper.renameFile(oldPath, newPath).then(() => {
+        // 如果开启了自动同步，发送重命名云端文件的消息
+        if (getAutoSync()) {
+          ipcRenderer.send('rename-file', {
+            oldKey: `${oldTitle}.md`,
+            newKey: `${value}.md`,
+          });
+        }
         setFiles(newFiles);
-        // 持久化文件列表数据
         saveFilesToStore(newFiles);
       });
     }
