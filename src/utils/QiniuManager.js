@@ -143,6 +143,26 @@ class QiniuManager {
         );
       });
     }
+
+  // 获取存储空间的文件列表
+  listPrefix() {
+    const options = {
+      limit: 100,
+      prefix: ''
+    };
+    return new Promise((resolve, reject) => {
+      this.bucketManager.listPrefix(this.bucket, options, (err, respBody, respInfo) => {
+        if (err) {
+          reject(err);
+        }
+        if (respInfo.statusCode === 200) {
+          resolve(respBody);
+        } else {
+          reject(new Error('获取文件列表失败'));
+        }
+      });
+    });
+  }
 }
 
 module.exports = QiniuManager;

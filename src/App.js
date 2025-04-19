@@ -374,6 +374,22 @@ function App() {
     saveFilesToStore(newFiles);
   };
 
+  const filesDownloaded = (event, newFiles) => {
+      // 合并现有文件和新下载的文件
+      const mergedFiles = [...files];
+      newFiles.forEach(newFile => {
+        const existingFileIndex = mergedFiles.findIndex(file => file.title === newFile.title);
+        if (existingFileIndex === -1) {
+          mergedFiles.push(newFile);
+        } else {
+          mergedFiles[existingFileIndex] = { ...mergedFiles[existingFileIndex], ...newFile };
+        }
+      });
+      
+      setFiles(mergedFiles);
+      saveFilesToStore(mergedFiles);
+    };
+
   useIpcRenderer({
     'create-new-file': createNewFile,
     'import-file': importFiles,
@@ -384,6 +400,7 @@ function App() {
       setLoading(status);
     },
     'files-uploaded': filesUploaded,
+    'files-downloaded': filesDownloaded,
   });
 
   const editorOptions = useMemo(() => {

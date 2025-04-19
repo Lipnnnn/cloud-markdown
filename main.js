@@ -8,6 +8,8 @@ const AppWindow = require('./src/AppWindow');
 const QiniuManager = require('./src/utils/QiniuManager.js');
 const settingsStore = new Store({ name: 'Settings' });
 const fileStore = new Store({ name: 'Files Data' });
+const { v4: uuidv4 } = require('uuid');
+const fileHelper = require('./src/utils/fileHelper');
 
 Store.initRenderer();
 
@@ -160,21 +162,90 @@ app.on('ready', () => {
 
   ipcMain.on('delete-file', (event, data) => {
     const manager = createManager();
-    manager.deleteFile(data.key).then(() => {
-      event.reply('file-deleted');
-    }).catch(() => {
-      dialog.showErrorBox('删除失败', '请检查七牛云配置参数是否正确');
-    });
+    manager
+      .deleteFile(data.key)
+      .then(() => {
+        event.reply('file-deleted');
+      })
+      .catch(() => {
+        dialog.showErrorBox('删除失败', '请检查七牛云配置参数是否正确');
+      });
   });
 
   ipcMain.on('rename-file', (event, data) => {
-      const manager = createManager();
-      manager.renameFile(data.oldKey, data.newKey).then(() => {
+    const manager = createManager();
+    manager
+      .renameFile(data.oldKey, data.newKey)
+      .then(() => {
         event.reply('file-renamed');
-      }).catch(() => {
+      })
+      .catch(() => {
         dialog.showErrorBox('重命名失败', '请检查七牛云配置参数是否正确');
       });
-    });
+  });
+
+  // 添加从七牛云下载所有文件的事件处理
+
+  // 修改下载处理代码
+  ipcMain.on('download-all-from-qiniu', () => {
+    mainWindow.webContents.send('loading-status', true);
+    const manager = createManager();
+    const savedLocation = settingsStore.get('savedFileLocation') || app.getPath('documents');
+    const existingFiles = fileStore.get('files') || [];
+
+    manager
+      .listPrefix()
+      .then((data) => {
+        const downloadPromiseArr = data.items.map((item) => {
+          const title = item.key.replace('.md', '');
+          const filePath = path.join(savedLocation, item.key);
+          // 查找是否存在相同标题的本地文件
+          const existingFile = existingFiles.find(file => file.title === title);
+          
+          return manager
+            .downloadFile(item.key, filePath)
+            .then(() => fileHelper.readFile(filePath))
+            .then((content) => ({
+              id: existingFile ? existingFile.id : uuidv4(), // 如果存在就使用原id
+              title,
+              path: filePath,
+              body: content,
+            }));
+        });
+
+        Promise.all(downloadPromiseArr)
+          .then((results) => {
+            const newFiles = results.map((file) => ({
+              ...file,  // 保留原有的 id
+              isLoaded: true,
+              isSynced: true,
+              updateAt: new Date().getTime(),
+            }));
+
+            // 保存到 fileStore
+            const existingFiles = fileStore.get('files') || [];
+            const updatedFiles = [...existingFiles, ...newFiles];
+            fileStore.set('files', updatedFiles);
+
+            mainWindow.webContents.send('files-downloaded', newFiles);
+            dialog.showMessageBox({
+              type: 'info',
+              title: '下载完成',
+              message: `成功下载了${results.length}个文件`,
+            });
+          })
+          .catch(() => {
+            dialog.showErrorBox('下载失败', '请检查七牛云配置参数是否正确');
+          })
+          .finally(() => {
+            mainWindow.webContents.send('loading-status', false);
+          });
+      })
+      .catch(() => {
+        dialog.showErrorBox('下载失败', '获取七牛云文件列表失败');
+        mainWindow.webContents.send('loading-status', false);
+      });
+  });
   // 在创建窗口后启用
   require('@electron/remote/main').enable(mainWindow.webContents);
 });
