@@ -158,6 +158,15 @@ app.on('ready', () => {
       });
   });
 
+  ipcMain.on('delete-file', (event, data) => {
+    const manager = createManager();
+    manager.deleteFile(data.key).then(() => {
+      event.reply('file-deleted');
+    }).catch(() => {
+      dialog.showErrorBox('删除失败', '请检查七牛云配置参数是否正确');
+    });
+  });
+
   // 在创建窗口后启用
   require('@electron/remote/main').enable(mainWindow.webContents);
 });

@@ -163,6 +163,12 @@ function App() {
       setFiles(withoutFileIds);
     } else {
       fileHelper.deleteFile(deleteFile.path).then(() => {
+        // 如果开启了自动同步，发送删除云端文件的消息
+        if (getAutoSync()) {
+          ipcRenderer.send('delete-file', {
+            key: `${deleteFile.title}.md`
+          });
+        }
         setFiles(withoutFileIds);
         saveFilesToStore(withoutFileIds);
         closeTab(id);
